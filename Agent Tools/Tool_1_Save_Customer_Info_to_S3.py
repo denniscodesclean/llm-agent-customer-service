@@ -1,14 +1,14 @@
 import json
 import boto3
 
-def lambda_handler(event, context):
-    agent = event['agent']
-    actionGroup = event['actionGroup']
-    function = event['function']
-    parameters = event.get('parameters', [])
+# Note here I used OpenAPI Schema to define the action group
+# Here's guidance on output requirement: https://docs.aws.amazon.com/bedrock/latest/userguide/agents-lambda.html
 
+def lambda_handler(event, context):
     # Print Log
-    #print("Received event:", json.dumps(event, indent=4))
+    print("Received event:", json.dumps(event, indent=4))
+
+    parameters = event.get('parameters', [])
 
     # Convert parameters to a dictionary
     param_dict = {param['name']: param['value'] for param in parameters}
@@ -30,7 +30,7 @@ def lambda_handler(event, context):
         "activities": activities
     }
 
-    def store_info_to_s3(full_name, gender, age, activities):
+    def store_info_to_s3(full_name='', gender='', age='', activities=''):
 
         s3_client = boto3.client('s3')
         bucket_name = 'customer-service-llm'
@@ -63,29 +63,31 @@ def lambda_handler(event, context):
             print(f"Error writing to S3: {str(e)}")
             raise
 
+    # Store to S3
+    store_info_to_s3(full_name, gender, age, activities)
 
-    if function == 'store_customer_info':
-        store_info_to_s3(full_name, gender, age, activities)
-
-    responseBody = {
-        "TEXT": {
-            "body": f"The function {function} was called successfully!"
+    response_body = {
+        'application/json': {
+            'body': "Lambda Function Successfully Invoked :)"
         }
     }
 
     action_response = {
-        'actionGroup': actionGroup,
-        'function': function,
-        'functionResponse': {
-            'responseBody': responseBody
-        }
+        'actionGroup': event['actionGroup'],
+        'apiPath': event['apiPath'],
+        'httpMethod': event['httpMethod'],
+        'httpStatusCode': 200,
+        'responseBody': response_body
     }
-
-    dummy_function_response = {
+    
+    session_attributes = event['sessionAttributes']
+    prompt_session_attributes = event['promptSessionAttributes']
+    
+    api_response = {
+        'messageVersion': '1.0', 
         'response': action_response,
-        'messageVersion': event['messageVersion']
+        'sessionAttributes': session_attributes,
+        'promptSessionAttributes': prompt_session_attributes
     }
-    
-    print("Response:", dummy_function_response)
-    
-    return dummy_function_response
+        
+    return api_response
